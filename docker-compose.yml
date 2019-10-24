@@ -1,0 +1,120 @@
+version: '2.2'
+services:
+  es01:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.4.1
+    container_name: es01
+    environment:
+      - node.name=es01
+      - discovery.seed_hosts=es02
+      - cluster.initial_master_nodes=es01,es02
+      - cluster.name=docker-cluster
+      - bootstrap.memory_lock=true
+      - xpack.monitoring.collection.enabled=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - esdata01:/usr/share/elasticsearch/data
+    ports:
+      - 9200:9200
+    networks:
+      - esnet
+  es02:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.4.1
+    container_name: es02
+    environment:
+      - node.name=es02
+      - discovery.seed_hosts=es02elasticsearch
+      - cluster.initial_master_nodes=es01,es02
+      - cluster.name=docker-cluster
+      - bootstrap.memory_lock=true
+      - xpack.monitoring.collection.enabled=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - esdata02:/usr/share/elasticsearch/data
+    networks:
+      - esnet
+
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:7.4.1
+    container_name: kibana
+    environment:
+        - ELASTICSEARCH_HOSTS=http://es01:9200
+    ports:
+      - 5601:5601
+    networks:
+      - esnet
+
+  heartbeat:
+    image: docker.elastic.co/beats/heartbeat:7.4.1
+    container_name: heartbeat
+    volumes:
+      - ./heartbeat.docker.yml:/usr/share/heartbeat/heartbeat.yml
+    environment:
+        - ELASTICSEARCH_HOSTS=http://es01:9200
+    networks:
+      - esnet
+
+  metricbeat:
+    image: docker.elastic.co/beats/metricbeat:7.4.1
+    container_name: metricbeat
+    environment:
+        - ELASTICSEARCH_HOSTS=http://es01:9200
+    networks:
+      - esnet
+
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:7.4.1
+    container_name: filebeat
+    environment:
+        - ELASTICSEARCH_HOSTS=http://es01:9200
+    networks:
+      - esnet
+
+  apmserver:
+    image: docker.elastic.co/apm/apm-server:7.4.1
+    ports:
+      - 8200:8200
+    container_name: apmserver
+    volumes:
+      - ./apm-server.yml:/usr/share/apm-server/apm-server.yml
+    environment:
+        - ELASTICSEARCH_HOSTS=http://es01:9200
+    networks:
+      - esnet
+
+  db:
+    image: postgres
+    container_name: db
+    networks:
+      - esnet
+
+  web:
+    build: .
+    command: python manage.py runserver 0.0.0.0:8000
+    container_name: web
+    volumes:
+      - .:/code
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    networks:
+      - esnet
+
+
+volumes:
+  esdata01:
+    driver: local
+  esdata02:
+    driver: local
+
+networks:
+  esnet:
