@@ -5,4 +5,4 @@ docker-compose down && docker-compose up -d && sleep 20 && docker-compose restar
 
 And look for:
 
-http://http://localhost:5601
+http://localhost:5601
